@@ -11,6 +11,14 @@
 
     expect owl file in (rdf)xml  format
 
+    xpths of interest
+
+    /rdf:RDF/owl:Class/@rdf:about
+    /rdf:RDF/owl:Class/rdfs:label
+    /rdf:RDF/owl:Class/rdfs:subClassOf//@rdf:resource
+    /rdf:RDF/owl:Class//owl:equivalentClass//@rdf:resource
+
+
 
 """
 
@@ -88,22 +96,11 @@ ROOT = TREE.getroot()
 if ROOT.tag != xpath_ns('rdf') + 'RDF':
     print('Where is rdf:RDF ?')
 
-xpth_comment = '''
-/rdf:RDF/owl:Class/@rdf:about
-/rdf:RDF/owl:Class/rdfs:comment
-/rdf:RDF/owl:Class/rdfs:label
-/rdf:RDF/owl:Class/rdfs:seeAlso
-/rdf:RDF/owl:Class/rdfs:subClassOf
-/rdf:RDF/owl:Class/rdfs:subClassOf/owl:Restriction/ [//owl:Class]
-'''
-
-
-# estabilish pedigree
+# record xml andestor pedigree
 parent_map = {c: p for p in ROOT.iter() for c in p}
 
-# print(parent_map)
 
-
+# recursive walk from element to root
 def path_len(element, pthlen):
     if element in parent_map:
         pthlen = path_len(parent_map[element], pthlen + 1)
@@ -112,6 +109,7 @@ def path_len(element, pthlen):
     return pthlen
 
 
+# user input with default
 # couretsy of https://stackoverflow.com/a/2533142/5714068
 def input_default(prompt, prefill=''):
     readline.set_startup_hook(lambda: readline.insert_text(prefill))
@@ -121,14 +119,14 @@ def input_default(prompt, prefill=''):
         readline.set_startup_hook()
 
 
+# classy things
 basenode = ('Class', 'NamedIndividual')
 othernode = ('subClassOf', 'equivalentClass')  # rdf:type
-
 leaf_values = ('someValuesFrom', 'allValuesFrom', 'hasValue')
 
 # DG.nodes(data=True)
 
-# clases as graph nodes
+# classy things as graph nodes
 for origin in basenode:
     for OntoClass in ROOT.findall('.//' + xpath_ns('owl') + origin):
         term_id = OntoClass.get(xpath_ns('rdf') + 'about')
@@ -142,15 +140,10 @@ for origin in basenode:
         if Label is not None:
             if 'label' not in DG.node[curie]:
                 DG.node[curie]['label'] = Label.text
-                # print(curie + " ! " + Label.text)
-                # print(DG[curie]['label'])
             elif DG.node[curie]['label'] != Label.text:
                 print("Warning competing labels for " + curie + "\n" +
                       DG.node[curie]['label'] + "\nand\n", Label.text)
-
-        superclass = {}
-
-        # edges as class-class relations subclass or equivelent
+        # edges as classy-classy relations subclass or equivelent
         for related in othernode:
             for OClass in OntoClass.findall(xpath_ns('rdfs') + related):
                 if OClass.get(xpath_ns('rdf') + 'resource') is not None:
@@ -174,7 +167,6 @@ for origin in basenode:
                                 'label': xmlns_curie(OClass.tag) + "_" +
                                 xmlns_curie(LeafV.tag),
                                 'weight': path_len(LeafV, 0)})
-
                             LeafV.clear()
                     OClass.clear()
         OntoClass.clear()
@@ -183,13 +175,9 @@ for origin in basenode:
 # dump the graph, may be able to reuse
 nx.write_graphml(DG, ARGS.destname, prettyprint=True)
 
-# eyecandy?
-# nx.draw_networkx(DG)
-# plt.draw()
-
 # lowercase prefix... note we have insanity  here
 # i.e. dc: and DC:
-# use for query maybe
+# use for query normalization maybe
 # c_m = {k.lower(): curie_map[k]for k in curie_map.keys()}
 
 # ask questions of the graph
@@ -200,7 +188,7 @@ while True:
     if curiequery == "":
         break
     elif curiequery not in DG.nodes():
-        continue
+        continue  # I mistype often
 
     # print(curiequery + " ! " + DG.node[curiequery]['label'])
     # normalize colon / underscore and case
